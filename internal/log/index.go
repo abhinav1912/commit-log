@@ -1,6 +1,7 @@
 package log
 
 import (
+	"io"
 	"os"
 
 	"github.com/tysonmote/gommap"
@@ -58,4 +59,36 @@ func (i *index) Close() error {
 		return err
 	}
 	return i.file.Close()
+}
+
+func (i *index) Read(in int64) (out uint32, pos uint64, err error) {
+	if i.size == 0 {
+		return 0, 0, io.EOF
+	}
+	if in == -1 {
+		out = uint32((i.size / totalWidth) - 1)
+	} else {
+		out = uint32(in)
+	}
+	pos = uint64(out) * totalWidth
+	if i.size < pos+totalWidth {
+		return 0, 0, io.EOF
+	}
+	out = enc.Uint32(i.mmap[pos : pos+offWidth])
+	pos = enc.Uint64(i.mmap[pos+offWidth : pos+totalWidth])
+	return out, pos, nil
+}
+
+func (i *index) Write(off uint32, pos uint64) error {
+	if uint64(len(i.mmap)) < i.size+totalWidth {
+		return io.EOF
+	}
+	enc.PutUint32(i.mmap[i.size:i.size+offWidth], off)
+	enc.PutUint64(i.mmap[i.size+offWidth:i.size+totalWidth], pos)
+	i.size += uint64(totalWidth)
+	return nil
+}
+
+func (i *index) Name() string {
+	return i.file.Name()
 }
