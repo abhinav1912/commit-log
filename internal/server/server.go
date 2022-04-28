@@ -4,6 +4,7 @@ import (
 	"context"
 
 	api "github.com/abhinav1912/commit-log/api/v1"
+	"google.golang.org/grpc"
 )
 
 type CommitLog interface {
@@ -21,6 +22,17 @@ type grpcServer struct {
 }
 
 var _ api.LogServer = (*grpcServer)(nil)
+
+func NewGRPCServer(config *Config) (*grpc.Server, error) {
+	// instantiate the service and register it to the created gRPC server
+	gsrv := grpc.NewServer()
+	srv, err := newgrpcServer(config)
+	if err != nil {
+		return nil, err
+	}
+	api.RegisterLogServer(gsrv, srv)
+	return gsrv, nil
+}
 
 func newgrpcServer(config *Config) (srv *grpcServer, err error) {
 	srv = &grpcServer{
