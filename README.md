@@ -18,6 +18,15 @@ Distributed Commit Log implementation using Golang.
 
 Todo: complete section
 
+## Libraries
+
+- protoc (data models)
+- gRPC (communication)
+- cfssl (generating certs)
+- crypto (encryption)
+- casbin (access control list)
+- testify (testing module)
+
 ## Installation
 
 Golang v1.15+ is recommended.
