@@ -1,6 +1,6 @@
 # Distributed Commit Log
 
-Commit log implementation using Golang.
+Distributed Commit Log implementation using Golang.
 
 ## Terminology
 
@@ -11,6 +11,10 @@ Commit log implementation using Golang.
 - Log—the abstraction that ties all the segments together.
 
 ## Features
+
+- Create data classes using protobuf
+- Authenticate client/server using certificates
+- Authorize with access control lists
 
 Todo: complete section
 
