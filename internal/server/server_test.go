@@ -38,8 +38,6 @@ func setupTest(t *testing.T, fn func(*Config)) (
 	)
 	require.NoError(t, err)
 
-	client = api.NewLogClient(cc)
-
 	serverTLSConfig, err := config.SetupTLSConfig(config.TLSConfig{
 		CertFile:      config.ServerCertFile,
 		KeyFile:       config.ServerKeyFile,
