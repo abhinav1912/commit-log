@@ -15,6 +15,7 @@ Distributed Commit Log implementation using Golang.
 - Create data classes using protobuf
 - Authenticate client/server using certificates
 - Authorize with access control lists
+- Metrics, tracing and logging for telemetry
 
 Todo: complete section
 
@@ -26,6 +27,8 @@ Todo: complete section
 - crypto (encryption)
 - casbin (access control list)
 - testify (testing module)
+- opencensus (metrics and tracing)
+- zap (logging)
 
 ## Installation
 
