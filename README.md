@@ -29,6 +29,7 @@ Todo: complete section
 - testify (testing module)
 - opencensus (metrics and tracing)
 - zap (logging)
+- serf (service discovery)
 
 ## Installation
 
