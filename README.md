@@ -16,6 +16,7 @@ Distributed Commit Log implementation using Golang.
 - Authenticate client/server using certificates
 - Authorize with access control lists
 - Metrics, tracing and logging for telemetry
+- Service discovery for nodes
 
 Todo: complete section
 
