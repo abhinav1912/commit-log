@@ -2,7 +2,9 @@ package log
 
 import (
 	"bytes"
+	"crypto/tls"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"time"
@@ -269,4 +271,51 @@ func (l *DistributedLog) setupRaft(dataDir string) error {
 		err = l.raft.BootstrapCluster(config).Error()
 	}
 	return err
+}
+
+type StreamLayer struct {
+	ln              net.Listener
+	serverTLSConfig *tls.Config
+	peerTLSConfig   *tls.Config
+}
+
+var _ raft.StreamLayer = (*StreamLayer)(nil)
+
+func NewStreamLayer(
+	ln net.Listener,
+	serverTLSConfig,
+	peerTLSConfig *tls.Config,
+) *StreamLayer {
+	return &StreamLayer{
+		ln:              ln,
+		serverTLSConfig: serverTLSConfig,
+		peerTLSConfig:   peerTLSConfig,
+	}
+}
+
+const RaftRPC = 1
+
+func (s *StreamLayer) Dial(addr raft.ServerAddress, timeout time.Duration) (net.Conn, error) {
+	// make outgoing connections to other servers in the cluster
+	dialer := &net.Dialer{Timeout: timeout}
+	var conn, err = dialer.Dial("tcp", string(addr))
+	if err != nil {
+		return nil, err
+	}
+	_, err = conn.Write([]byte{byte(RaftRPC)})
+	if err != nil {
+		return nil, err
+	}
+	if s.peerTLSConfig != nil {
+		conn = tls.Client(conn, s.peerTLSConfig)
+	}
+	return conn, err
+}
+
+func (s *StreamLayer) Close() error {
+	return s.ln.Close()
+}
+
+func (s *StreamLayer) Addr() net.Addr {
+	return s.ln.Addr()
 }
