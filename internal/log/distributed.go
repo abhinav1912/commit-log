@@ -190,7 +190,7 @@ func (l *DistributedLog) setupLog(dataDir string) error {
 }
 
 func (l *DistributedLog) setupRaft(dataDir string) error {
-	// fsm = &fsm{log: l.log}
+	fsm := &fsm{log: l.log}
 	logDir := filepath.Join(dataDir, "raft", "log")
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return err
@@ -282,6 +282,10 @@ func (l *DistributedLog) apply(reqType RequestType, req proto.Message) (interfac
 		return nil, err
 	}
 	b, err := proto.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	_, err = buf.Write(b)
 	if err != nil {
 		return nil, err
 	}
@@ -406,6 +410,25 @@ func (s *StreamLayer) Dial(addr raft.ServerAddress, timeout time.Duration) (net.
 		conn = tls.Client(conn, s.peerTLSConfig)
 	}
 	return conn, err
+}
+
+func (s *StreamLayer) Accept() (net.Conn, error) {
+	conn, err := s.ln.Accept()
+	if err != nil {
+		return nil, err
+	}
+	b := make([]byte, 1)
+	_, err = conn.Read(b)
+	if err != nil {
+		return nil, err
+	}
+	if bytes.Compare([]byte{byte(RaftRPC)}, b) != 0 {
+		return nil, fmt.Errorf("not a raft rpc")
+	}
+	if s.serverTLSConfig != nil {
+		return tls.Server(conn, s.serverTLSConfig), nil
+	}
+	return conn, nil
 }
 
 func (s *StreamLayer) Close() error {
