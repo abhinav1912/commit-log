@@ -3,6 +3,7 @@ package log
 import (
 	"bytes"
 	"crypto/tls"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -271,6 +272,101 @@ func (l *DistributedLog) setupRaft(dataDir string) error {
 		err = l.raft.BootstrapCluster(config).Error()
 	}
 	return err
+}
+
+func (l *DistributedLog) apply(reqType RequestType, req proto.Message) (interface{}, error) {
+	// replicate record and append to leader's log
+	var buf bytes.Buffer
+	_, err := buf.Write([]byte{byte(reqType)})
+	if err != nil {
+		return nil, err
+	}
+	b, err := proto.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	timeout := 10 * time.Second
+	future := l.raft.Apply(buf.Bytes(), timeout)
+	if future.Error() != nil {
+		// replication failed
+		return nil, future.Error()
+	}
+	res := future.Response()
+	if err, ok := res.(error); ok {
+		return nil, err
+	}
+	return res, nil
+}
+
+func (l *DistributedLog) Append(record *api.Record) (uint64, error) {
+	// tell FSM to append the record to the log
+	res, err := l.apply(AppendRequestType, &api.ProduceRequest{Record: record})
+	if err != nil {
+		return 0, err
+	}
+	return res.(*api.ProduceResponse).Offset, nil
+}
+
+func (l *DistributedLog) Read(offset uint64) (*api.Record, error) {
+	return l.log.Read(offset)
+}
+
+func (l *DistributedLog) Join(id, addr string) error {
+	// adds server to Raft cluster
+	configFuture := l.raft.GetConfiguration()
+	if err := configFuture.Error(); err != nil {
+		return err
+	}
+	serverID := raft.ServerID(id)
+	serverAddr := raft.ServerAddress(addr)
+	for _, srv := range configFuture.Configuration().Servers {
+		if srv.ID == serverID || srv.Address == serverAddr {
+			if srv.ID == serverID || srv.Address == serverAddr {
+				// server has already joined
+				return nil
+			}
+			// remove existing server
+			removeFuture := l.raft.RemoveServer(serverID, 0, 0)
+			if err := removeFuture.Error(); err != nil {
+				return err
+			}
+		}
+	}
+	addFuture := l.raft.AddVoter(serverID, serverAddr, 0, 0)
+	if err := addFuture.Error(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (l *DistributedLog) Leave(id string) error {
+	removeFuture := l.raft.RemoveServer(raft.ServerID(id), 0, 0)
+	return removeFuture.Error()
+}
+
+func (l *DistributedLog) WaitForLeader(timeout time.Duration) error {
+	// blocks cluster until leader is elected to timeout
+	timeoutc := time.After(timeout)
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-timeoutc:
+			return fmt.Errorf("timed out")
+		case <-ticker.C:
+			if l := l.raft.Leader(); l != "" {
+				return nil
+			}
+		}
+	}
+}
+
+func (l *DistributedLog) Close() error {
+	f := l.raft.Shutdown()
+	if err := f.Error(); err != nil {
+		return err
+	}
+	return l.log.Close()
 }
 
 type StreamLayer struct {
